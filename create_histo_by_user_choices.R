@@ -90,11 +90,12 @@ if ( args$cell_type == FALSE && args$info == FALSE  ){ ##no argument given:
     pdf(paste0(output_dir,"Graph_of_Expr_",gene_name,"_SCdata.pdf" ))
       ggplot(tab_to_plot, aes(x =TimePoint, y=MeanExpr, fill=CellType)) +
             geom_bar(stat="identity", width=0.5,position="dodge") +
-            ggtitle(gene_name) + theme_minimal()
-            ##+geom_errorbar(aes(x =TimePoint, ymin=MeanExpr-STD, ymax=MeanExpr+STD),position="dodge",colour="grey",size=0.4)+
-            ## error bars are HUGE !!
+            ggtitle(gene_name) + theme_minimal()+
+            +geom_errorbar(aes(x =TimePoint, ymin=MeanExpr-SEM, ymax=MeanExpr+SEM),
+                           position="dodge",colour="grey",size=0.4)+
+            
     dev.off()
 
     #.....
-    q("yes")
+    #q("yes")
 }
