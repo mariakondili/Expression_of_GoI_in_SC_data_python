@@ -80,5 +80,5 @@ if ( args$cell_type == FALSE && args$info == FALSE  ){ ##no argument given:
         dev.off()
 
     #.....
-    q("yes")
+    #q("yes")
 }
