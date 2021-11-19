@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-## Subject: Run the script for a selection of Genes in "Input/List_Genes_of_Interest_Capucine.csv",on Source Data "GSE143437_noFACS_cells"
-##          and create Mean_expr tabs per cell-type
-##          Run then Rscript "create_graphs_expr.R", which produces for a list of Genes of Interest a merged table and histograms per timepoint.
+## Subject: Run the script for a selection of Genes,given in a .tsv with Name and Description
+##          Calculate Mean_expr and SEM per cell-type along replicates
+##          Then: Run then Rscript "create_histo.R", which produces Histograms per cell-type for the genes-of-Interest,along Timepoints.
 
 import os
 import numpy as np
@@ -13,16 +13,12 @@ import glob
 import re
 
 
-#import dill ## save session
-## dill.load_session("sc_anal.pkl")
-
 ##> Read genes-list from user:
 parser = argparse.ArgumentParser(description = 'give a list of genes of interest')
-parser.add_argument("-g", "--genelist", required=True,
-                    type=argparse.FileType('r'),
-                    help="a list of genes (in 1 column) to be searched in the dataset for expression")
-parser.add_argument("-o", "--outfilepath", required=True,
-                    help="output directory to save mean-expr. tables.")
+parser.add_argument("-g", "--genelist", required=True,type=argparse.FileType('r'),help="a list of genes (in 1 column) to be searched in the dataset for expression")
+parser.add_argument("-o", "--outdir", required=True,help="output directory to save mean-expr. tables.")
+parser.add_argument("-d", "--datafile", required=True, type=str,help="the file containing all expression data")
+parser.add_argument("-m", "--metadata", required=True, type=str, help="the file of metadata explaining columns of expr.data")
 
 args = parser.parse_args()
 GoI_file = args.genelist
@@ -35,39 +31,27 @@ print("The Genes are : \n")
 print(GoI)
 
 
-# @ Musclor :data_dir="/data/Maria/Single_Cell_deMicheli/"
-data_dir="/projects/single_cell_skeletal_muscle/Input/"
-#data_dir = "D://XENA/myWorkspace/PROJECTS/Single_Cell_DeMicheli/"
-md = pd.read_table(data_dir + "GSE143437_noFACS_cells/MuSCatlas_metadata.txt",header=0,sep="\t",index_col=0 )
+md = pd.read_table( args.metadata, header=0,sep="\t",index_col=0 )
 ## md.columns =  sampleID	nUMI	nGene	percent_mito	injury	cell_annotation
 
-## Find ALL CELL-types :
-cell_types = md["cell_annotation"].unique()
-
 ## Read the columns of FAPs in the normalized.data.table
-data = pd.read_table(data_dir + "GSE143437_noFACS_cells/MuSCatlas_normalizeddata.txt",header=0,sep="\t",index_col=0)
+data = pd.read_table(args.datafile, header=0,sep="\t",index_col=0)
 
-#import pickle
-# with open('sc_full_data.pkl', 'wb') as outdataf:
-#      pickle.dump(data, outdataf, pickle.HIGHEST_PROTOCOL)
+import pickle
+with open('sc_data.pkl', 'wb') as outdataf:
+      pickle.dump(data, outdataf, pickle.HIGHEST_PROTOCOL)
 
-#with open('sc_full_data.pkl', 'rb') as indataf:
+#with open('sc_data.pkl', 'rb') as indataf:
 #    data = pickle.load(indataf)
-## OR :
-#data.to_pickle(path=,compression="gzip")
-#read_pickle()
 
-# data.shape[1] = 34438, # or len(data.columns)
-# data.shape[0] = 19208
+data.shape[1]
+data.shape[0]
 
 gene_names = data.index
 found =  [g in gene_names for g in GoI]
 genesfound = dict(zip(GoI,found))
-#>> {'Tgfb1': True, 'Edn1': True, 'Et1rb': False, 'Col7a1': True}
 
 line_genes = [l for l,g in enumerate(gene_names) if g in genesfound and genesfound[g] == True]
-## lines = [6274, 11604, 16846]
-
 
 outdir = args.outdir
 if not(os.path.exists(outdir)):
@@ -76,11 +60,13 @@ if not(os.path.exists(outdir)):
 
 merged_expr = pd.DataFrame()
 
+## Find ALL CELL-types :
+cell_types = md["cell_annotation"].unique()
+
 for ct in cell_types :
-    # ct=cell_types[4]
+
     print(f"{ct}  will be processed...")
     cell_ids = [md.index[i] for i in range(md.shape[0])  if md.iloc[i]["cell_annotation"] == ct ]
-    ##8760 cells are in FAPs
     print(f"{len(cell_ids)} cells are included in {ct}.")
     ## Choose only columns of the cell-type
     tab_celltype    = data[cell_ids]
@@ -102,15 +88,15 @@ for ct in cell_types :
     ##--- Save a table of Means + SEM
     ct = ct.replace("/","_").replace(" ","_")
     mean_expr_ct  = pd.concat([ct_day0_Mean_expr,ct_day2_Mean_expr, ct_day5_Mean_expr,ct_day7_Mean_expr],axis=1, join="inner", keys= ["D0","D2","D5","D7"])
-    mean_expr_ct["gene_name"] = mean_expr_ct.index
-    mean_expr_ct["cell_type"] = ct
-    reshaped_expr_ct = pd.melt(mean_expr_ct, id_vars=["gene_name","cell_type"],var_name="TimePoint",value_name="MeanExpr")
+    mean_expr_ct["GeneName"] = mean_expr_ct.index
+    mean_expr_ct["CellType"] = ct
+    reshaped_expr_ct = pd.melt(mean_expr_ct, id_vars=["GeneName","CellType"],var_name="TimePoint",value_name="MeanExpr")
     #mean_expr_ct.to_csv(outdir+"mean_expr_per_day_"+ct+".csv",header=True, sep="\t", na_rep = "NA",index=True,encoding="utf-8")
     #print("Mean-expr.table written!")
     sem_expr_ct  = pd.concat([ct_day0_sem, ct_day2_sem, ct_day5_sem,ct_day7_sem],axis=1, join="inner", keys= ["D0","D2","D5","D7"])
     sem_expr_ct["gene_name"] = sem_expr_ct.index
     sem_expr_ct["cell_type"] = ct
-    reshaped_sem_ct = pd.melt(sem_expr_ct, id_vars=["gene_name","cell_type"],var_name="TimePoint",value_name="SEM")
+    reshaped_sem_ct = pd.melt(sem_expr_ct, id_vars=["GeneName","CellType"],var_name="TimePoint",value_name="SEM")
     #sem_expr_ct.to_csv(outdir+"sem_expr_per_day_"+ct+".csv",header=True, sep="\t", na_rep = "NA",index=True,encoding="utf-8")
     #print("SEM of mean expr.table written!")
 
@@ -124,11 +110,9 @@ for ct in cell_types :
 ### WRITE FINAL MERGED TABLE TO A FILE :
 ###
 os.makedirs(outdir+"Merged/")
-merged_expr.to_csv(outdir+"Merged/MeanExpr_All_CellTypes_"+outfilepath +".csv",header=True, sep="\t", na_rep = "NA",index=True,encoding="utf-8")
+outfilepath = os.path.basename(GoI_file)
+merged_expr.to_csv(outdir+"Merged/MeanExpr_All_CellTypes_"+ outfilepath, header=True, sep="\t", na_rep = "NA",index=True,encoding="utf-8")
 
 
 ###____SAVE ALL VARIABLES IN ENV ____##
 # https://stackoverflow.com/questions/2960864/how-to-save-all-the-variables-in-the-current-python-session
-
-##_______________SAVE SESSION _______________##
-##dill.dump_session("sc_anal.pkl")

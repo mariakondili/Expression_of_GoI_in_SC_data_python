@@ -9,14 +9,6 @@ library(ggplot2)
 
 
 ###---
-###--- LOCATE YOURSELF :
-###---
-
-work_dir <- "~/PROJECTS/Single_Cell_Analysis/"
-input_dir <- paste0(work_dir, "Input/")
-output_dir <- paste0(work_dir,"R_create_graph_per_gene/")
-
-###---
 ###--- PARSE INPUT ARGUMENTS :
 ###---
 
@@ -36,22 +28,6 @@ parser$add_argument("-o","--output_dir", action="store", default=FALSE, help="Gi
 args <- parser$parse_args()
 print(args)
 
-
-###---
-###--- TEST MY OWN VARIABLES FOR LAUNCHING SCRIPT
-###---
-
-input_gene_list <- paste0(input_dir,"DM1_geneset.tsv" )
-# input_gene_list <- paste0(input_dir,"DM1_geneset1_DF.tsv" )
-# input_gene_list <- paste0(input_dir,"Geneset1_CP.tsv" )
-
-args$cell_type <- "Anti-inflammatory_macrophages,MuSCs_and_progenitors,Smooth_muscle_cells,Tenocytes"
-
-args$output_dir <- paste0(work_dir,"R_create_graph_per_gene/Graphs_D0-D2-D7_per_gene")
-
-dir.create(args$output_dir, showWarnings = FALSE)
-
-
 ###---
 ###--- VERIFICATIONS OF INPUT
 ###---
@@ -64,7 +40,7 @@ if ( args$cell_type == FALSE && args$info == FALSE  ){ ##no argument given:
 
 } else if (args$info) {
 
-    merged_expr <-  readRDS("Merged_GeneExpr_per_CellType.rds")
+    merged_expr <-  read_delim("Merged_GeneExpr_per_CellType.tsv",delim="\t")
 
     cat("\n>>The gene_names from which to choose: "); print(levels(as.factor(merged_expr$GeneName)))
     cat("\n>>The cell-types from which to choose: "); print(levels(as.factor(merged_expr$CellType)))
@@ -82,18 +58,26 @@ if ( args$cell_type == FALSE && args$info == FALSE  ){ ##no argument given:
     gene_name <- args$gene_name
     cell_type <- args$cell_type
 
+    merged_expr <-  read_delim("Merged_GeneExpr_per_CellType.tsv",delim="\t") #>> to change with name of "Merged" table of expr.values created with "analyse_sc.py"
 
-    tab_to_plot <- merged_expr[intersect(which(merged_expr$GeneName %in% gene_name),
-                                         which(merged_expr$CellType %in% cell_type)) , ]
+    for (g in gene_name){
+        tab_to_plot <- merged_expr[intersect(which(merged_expr$GeneName %in% gene_name),
+                                             which(merged_expr$CellType %in% cell_type)) , ]
 
+        tab_to_plot$TimePoint <- factor(tab_to_plot$TimePoint)
+        tab_to_plot$TimePoint <- fct_relevel(tab_to_plot$TimePoint, c("D0","D2","D5","D7"))
 
-    pdf(paste0(output_dir,"Graph_of_Expr_",gene_name,"_SCdata.pdf" ))
-      ggplot(tab_to_plot, aes(x =TimePoint, y=MeanExpr, fill=CellType)) +
-            geom_bar(stat="identity", width=0.5,position="dodge") +
-            ggtitle(gene_name) + theme_minimal()
-            ##+geom_errorbar(aes(x =TimePoint, ymin=MeanExpr-STD, ymax=MeanExpr+STD),position="dodge",colour="grey",size=0.4)+
-            ## error bars are HUGE !!
-    dev.off()
+        png(paste0(args$output_dir,"/Graph_of_Expr_",gene_name,"_SCdata.png" ))
+            p <- ggplot(tab_to_plot, aes(x=TimePoint, y=MeanExpr, fill= TimePoint)) +
+                  geom_bar(stat="identity", width=0.9, position="dodge") +
+                  theme(axis.text.x=element_blank()) +
+                  geom_errorbar(aes(ymin=MeanExpr-SEM, ymax=MeanExpr+SEM,color=TimePoint),
+                                position="dodge",width=0.9,size=0.1)
+            ## width of errorbar and geom_bar must be same,otherwise no overlap !
+            ## width= {0.0, .., 1}
+            p2 <- p + facet_wrap(~CellType) + ggtitle(g) + theme_minimal() + theme(axis.text.x=element_text(angle=45))
+            print(p2)
+        dev.off()
 
     #.....
     q("yes")
