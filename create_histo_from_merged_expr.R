@@ -22,14 +22,15 @@ output_dir <- paste0(work_dir,"R_graphs/")
 ###---
 
 args <- list()
-args$gene_list <- paste0(input_dir,"AAV_receptors_genes.tsv" )
+args$gene_list <- paste0(input_dir,"my_genes.tsv" )
 
 args$cell_type <- c("Anti-inflammatory_macrophages","B_T_NK_cells",
                     "Endothelial","FAPs","Mature_skeletal_muscle","Monocytes_Macrophages_Platelets",
                     "MuSCs_and_progenitors","Neural_Glial_Schwann_cells","Pro-inflammatory_macrophages",
                     "Resident_Macrophages_APCs","Smooth_muscle_cells","Tenocytes")
+##> terms should be as given from metadata file of published S.C. data
 
-args$output_dir <- paste0(output_dir,"aavR_graphs/")
+args$output_dir <- paste0(output_dir,"my_GoI_graphs/")
 
 merged_expr <-  read_delim(paste0(work_dir,"Output/Merged/Merged_MeanExpr+sem_All_CellTypes.tsv"),
                            delim="\t")
